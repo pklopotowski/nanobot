@@ -38,6 +38,11 @@ _CRON_PARAMETERS = tool_parameters_schema(
         "ISO datetime for one-time execution (e.g. '2026-02-12T10:30:00'). "
         "Naive values use the tool's default timezone."
     ),
+    model_preset=StringSchema(
+        "Optional model preset name (must exist in modelPresets config) to use when this job fires. "
+        "When omitted, the job runs with the agent's currently-active preset. Useful for routing "
+        "ritual cron jobs to a more capable model while keeping interactive chat on a faster one."
+    ),
     job_id=StringSchema("REQUIRED when action='remove'. Job ID to remove (obtain via action='list')."),
     required=["action"],
     description=(
@@ -144,12 +149,13 @@ class CronTool(Tool, ContextAware):
         at: str | None = None,
         job_id: str | None = None,
         deliver: bool = True,
+        model_preset: str | None = None,
         **kwargs: Any,
     ) -> str:
         if action == "add":
             if self._in_cron_context.get():
                 return "Error: cannot schedule new jobs from within a cron job execution"
-            return self._add_job(name, message, every_seconds, cron_expr, tz, at)
+            return self._add_job(name, message, every_seconds, cron_expr, tz, at, model_preset)
         elif action == "list":
             return self._list_jobs()
         elif action == "remove":
@@ -164,6 +170,7 @@ class CronTool(Tool, ContextAware):
         cron_expr: str | None,
         tz: str | None,
         at: str | None,
+        model_preset: str | None = None,
     ) -> str:
         if not message:
             return (
@@ -219,6 +226,7 @@ class CronTool(Tool, ContextAware):
             origin_channel=origin_channel,
             origin_chat_id=origin_chat_id,
             origin_metadata=dict(self._origin_metadata.get() or {}),
+            model_preset=(model_preset or None),
         )
         return f"Created job '{job.name}' (id: {job.id})"
 

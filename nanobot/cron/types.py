@@ -32,6 +32,7 @@ class CronPayload:
     origin_channel: str | None = None
     origin_chat_id: str | None = None
     origin_metadata: dict[str, Any] = field(default_factory=dict)
+    model_preset: str | None = None  # optional per-job model preset override (resolved at fire time)
 
 
 @dataclass

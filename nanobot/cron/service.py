@@ -251,6 +251,7 @@ class CronService:
                                 or j["payload"].get("origin_metadata")
                                 or {}
                             ),
+                            model_preset=j["payload"].get("modelPreset") or j["payload"].get("model_preset"),
                         ),
                         state=CronJobState(
                             next_run_at_ms=j.get("state", {}).get("nextRunAtMs"),
@@ -389,6 +390,7 @@ class CronService:
                         "originChannel": j.payload.origin_channel,
                         "originChatId": j.payload.origin_chat_id,
                         "originMetadata": j.payload.origin_metadata,
+                        "modelPreset": j.payload.model_preset,
                     },
                     "state": {
                         "nextRunAtMs": j.state.next_run_at_ms,
@@ -654,6 +656,7 @@ class CronService:
         origin_channel: str | None = None,
         origin_chat_id: str | None = None,
         origin_metadata: dict | None = None,
+        model_preset: str | None = None,
     ) -> CronJob:
         """Add a new job."""
         _validate_schedule_for_add(schedule)
@@ -675,6 +678,7 @@ class CronService:
                 origin_channel=origin_channel,
                 origin_chat_id=origin_chat_id,
                 origin_metadata=origin_metadata or {},
+                model_preset=model_preset,
             ),
             state=CronJobState(next_run_at_ms=_compute_next_run(schedule, now)),
             created_at_ms=now,
