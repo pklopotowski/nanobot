@@ -42,6 +42,11 @@ _CRON_PARAMETERS = tool_parameters_schema(
         description="Whether to deliver the execution result to the user channel (default true)",
         default=True,
     ),
+    model_preset=StringSchema(
+        "Optional model preset name (must exist in modelPresets config) to use when this job fires. "
+        "When omitted, the job runs with the agent's currently-active preset. Useful for routing "
+        "ritual cron jobs to a more capable model while keeping interactive chat on a faster one."
+    ),
     job_id=StringSchema("REQUIRED when action='remove'. Job ID to remove (obtain via action='list')."),
     required=["action"],
     description=(
@@ -142,12 +147,15 @@ class CronTool(Tool, ContextAware):
         at: str | None = None,
         job_id: str | None = None,
         deliver: bool = True,
+        model_preset: str | None = None,
         **kwargs: Any,
     ) -> str:
         if action == "add":
             if self._in_cron_context.get():
                 return "Error: cannot schedule new jobs from within a cron job execution"
-            return self._add_job(name, message, every_seconds, cron_expr, tz, at, deliver)
+            return self._add_job(
+                name, message, every_seconds, cron_expr, tz, at, deliver, model_preset
+            )
         elif action == "list":
             return self._list_jobs()
         elif action == "remove":
@@ -163,6 +171,7 @@ class CronTool(Tool, ContextAware):
         tz: str | None,
         at: str | None,
         deliver: bool = True,
+        model_preset: str | None = None,
     ) -> str:
         if not message:
             return (
@@ -216,6 +225,7 @@ class CronTool(Tool, ContextAware):
             delete_after_run=delete_after,
             channel_meta=self._metadata.get(),
             session_key=self._session_key.get() or None,
+            model_preset=(model_preset or None),
         )
         return f"Created job '{job.name}' (id: {job.id})"
 

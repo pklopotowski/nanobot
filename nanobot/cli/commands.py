@@ -1067,6 +1067,33 @@ def _run_gateway(
         if isinstance(message_tool, MessageTool):
             message_record_token = message_tool.set_record_channel_delivery(True)
 
+        # Per-job model preset override: snapshot the active preset, switch for the
+        # turn, restore in finally. The cron service executes jobs sequentially, so a
+        # global agent state swap is safe within this scope. Unknown preset names are
+        # logged and ignored (job runs with the current preset).
+        preset_override = (job.payload.model_preset or "").strip()
+        previous_preset = agent.model_preset if preset_override else None
+        preset_switched = False
+        if preset_override:
+            if preset_override in agent.model_presets:
+                try:
+                    agent.set_model_preset(preset_override, publish_update=False)
+                    preset_switched = True
+                    logger.info(
+                        "Cron: job '{}' using model preset '{}' (was '{}')",
+                        job.name, preset_override, previous_preset,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Cron: failed to switch to preset '{}' for job '{}'; "
+                        "running with current preset", preset_override, job.name,
+                    )
+            else:
+                logger.warning(
+                    "Cron: job '{}' references unknown model preset '{}'; "
+                    "running with current preset", job.name, preset_override,
+                )
+
         try:
             resp = await agent.process_direct(
                 reminder_note,
@@ -1076,6 +1103,14 @@ def _run_gateway(
                 on_progress=_silent,
             )
         finally:
+            if preset_switched:
+                try:
+                    agent.set_model_preset(previous_preset, publish_update=False)
+                except Exception:
+                    logger.exception(
+                        "Cron: failed to restore preset '{}' after job '{}'",
+                        previous_preset, job.name,
+                    )
             if isinstance(cron_tool, CronTool) and cron_token is not None:
                 cron_tool.reset_cron_context(cron_token)
             if isinstance(message_tool, MessageTool) and message_record_token is not None:
